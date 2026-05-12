@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(role) {
+      return isSignedIn() && getUserData().role == role;
+    }
+    
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    
+    function isAnalyst() {
+      return hasRole('analyst') || isAdmin();
+    }
+    
+    function isViewer() {
+      return isSignedIn(); // All signed in users are viewers at minimum
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && userId == request.auth.uid && incoming().role == 'viewer';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // --- Threats ---
+    function isValidThreat(data) {
+      return data.type is string && data.type.size() <= 100 &&
+             data.sourceIp is string && data.sourceIp.size() <= 45 &&
+             data.severity in ['low', 'medium', 'high', 'critical'] &&
+             data.status is string &&
+             data.timestamp is timestamp;
+    }
+
+    match /threats/{threatId} {
+      allow read: if isViewer();
+      allow create: if isAnalyst() && isValidThreat(incoming()) && isValidId(threatId);
+      allow update: if isAnalyst() && isValidThreat(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'description', 'severity'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- Incidents ---
+    function isValidIncident(data) {
+      return data.threatId is string &&
+             data.status in ['open', 'investigating', 'mitigated', 'resolved'] &&
+             data.priority in ['low', 'medium', 'high', 'critical'] &&
+             data.createdAt is timestamp;
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isViewer();
+      allow create: if isAnalyst() && isValidIncident(incoming()) && 
+                    exists(/databases/$(database)/documents/threats/$(incoming().threatId));
+      allow update: if isAnalyst() && isValidIncident(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'priority', 'resolutionNotes', 'assignedAnalystId'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- Devices ---
+    function isValidDevice(data) {
+      return data.name is string && data.name.size() <= 100 &&
+             data.ip is string && data.ip.size() <= 45 &&
+             data.status in ['online', 'offline', 'compromised'] &&
+             data.lastActive is timestamp;
+    }
+
+    match /devices/{deviceId} {
+      allow read: if isViewer();
+      allow create: if isAnalyst() && isValidDevice(incoming());
+      allow update: if isAnalyst() && isValidDevice(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastActive'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // --- Logs ---
+    match /log_events/{logId} {
+      allow read: if isViewer();
+      allow create: if isSignedIn(); // System components can log events
+      allow update, delete: if false; // Logs are immutable
+    }
+  }
+}

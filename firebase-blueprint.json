@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users with role-based access control.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "analyst", "viewer"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Threat": {
+      "title": "Threat",
+      "description": "Identified security threats from monitoring systems.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "sourceIp": { "type": "string" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["type", "sourceIp", "severity", "timestamp", "status"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Tracking of identified threats through resolution phases.",
+      "type": "object",
+      "properties": {
+        "threatId": { "type": "string" },
+        "assignedAnalystId": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "investigating", "mitigated", "resolved"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "resolutionNotes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["threatId", "status", "priority", "createdAt"]
+    },
+    "Device": {
+      "title": "Device",
+      "description": "Managed devices in the environment.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "ip": { "type": "string" },
+        "os": { "type": "string" },
+        "status": { "type": "string", "enum": ["online", "offline", "compromised"] },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "ip", "os", "status", "lastActive"]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "System activity and security event logs.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "severity": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["type", "message", "severity", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "App user roles and profiles"
+    },
+    "threats": {
+      "schema": "Threat",
+      "description": "Active monitoring threat data"
+    },
+    "incidents": {
+      "schema": "Incident",
+      "description": "Incident response cases"
+    },
+    "devices": {
+      "schema": "Device",
+      "description": "Monitored infrastructure assets"
+    },
+    "log_events": {
+      "schema": "Log",
+      "description": "High-volume activity logs"
+    }
+  }
+}
